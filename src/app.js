@@ -1,60 +1,95 @@
 import SHA256 from 'crypto-js/sha256'
 
+class Transaction {
+    constructor(from, to, amount) {
+        this.from = from
+        this.to = to
+        this.amount = amount
+    }
+}
+
 class Block {
-    constructor(index, data, date, previousBlock = '') {
-        this.index = index
-        this.data = data
-        this.date = date
+    constructor(transactions, timestamp, previousBlock = '') {
+        this.transactions = transactions
+        this.timestamp = timestamp
         this.previousBlock = previousBlock
         this.hash = this.calculateHash()
         this.random = 0
     }
 
-    mineBlock(difficulty) { 
+    mineBlock(difficulty) {
         let prefix = Array(difficulty + 1).join("0")
-        while(true) {
-            let hash = this.calculateHash() 
-            if(hash.startsWith(prefix)) {
-                return hash
+        while (true) {
+            let hash = this.calculateHash()
+            if (hash.startsWith(prefix)) {
+                this.hash = hash
+                return
             }
             this.random += 1
         }
     }
 
-    calculateHash() { 
-        return new SHA256(this.index + 
-                JSON.stringify(this.data) + 
-                this.date + 
-                this.previousBlock + 
-                this.random)
-            .toString()         
+    calculateHash() {
+        return new SHA256(this.transactions +
+            this.previousBlock +
+            this.random)
+            .toString()
     }
 }
 
 class BlockChain {
-    
+
     constructor() {
         this.chain = [this.createGenesisBlock()]
-        this.difficulty = 5
+        this.difficulty = 2
+        this.miningRewardCoins = 100
+        this.pendingTransactions = []
     }
 
     createGenesisBlock() {
-        let genesisBlock = new Block(1, "Genesis block", "13/7/2018")
+        let genesisBlock = new Block([], "Genesis block", Date.now())
         return genesisBlock
     }
 
-    addBlock(block) {
+    createTransactions(transactions) {
+        for(const transaction of transactions) {
+            this.pendingTransactions.push(transaction)
+        }
+    }
+
+    minePendingTransactions(minerAddress) {
+        let block = new Block(this.pendingTransactions, Date.now())
         block.previousBlock = this.chain[this.chain.length - 1].hash
-        block.hash = block.mineBlock(this.difficulty)
-        this.chain[this.chain.length] = block
+        block.mineBlock(this.difficulty)
+        this.pendingTransactions = [
+            new Transaction(null, minerAddress, this.miningRewardCoins)
+        ]
+        this.chain.push(block)
+    }
+
+    getBalance(miner) {
+        let balance = 0
+
+        for (const block of this.chain) {
+            for (const transaction of block.transactions) {
+                if (miner === transaction.from) {
+                    balance -= transaction.amount
+                }
+                if (miner === transaction.to) {
+                    balance += transaction.amount
+                }
+            }
+        }
+
+        return balance
     }
 
     isValid() {
-        for(var i=1; i< this.chain.length; i++) {
+        for (var i = 1; i < this.chain.length; i++) {
             if (this.chain[i].hash != this.chain[i].calculateHash()) {
                 return false
             }
-            if (this.chain[i].previousBlock != this.chain[i-1].hash) {
+            if (this.chain[i].previousBlock != this.chain[i - 1].hash) {
                 return false
             }
         }
@@ -63,16 +98,31 @@ class BlockChain {
 }
 
 let blockChain = new BlockChain()
-console.log("Adding first block")
-blockChain.addBlock(new Block(1, { amount: 10 }, "14/7/2018"))
-console.log("Adding second block")
-blockChain.addBlock(new Block(2, "some data", "14/7/2018"))
-console.log("Adding third block")
-blockChain.addBlock(new Block(3, { amount: 20 }, "15/7/2018"))
-console.log("Adding fourth block")
-blockChain.addBlock(new Block(4, "some more data", "15/7/2018"))
 
-console.log(blockChain)
-console.log(blockChain.isValid())
-blockChain.chain[2].data = "x"
-console.log(blockChain.isValid())
+let firstSetOfTransactions = [
+    new Transaction("swapnil", "supriya", 100),
+    new Transaction("supriya", "swapnil", 50)
+]
+blockChain.createTransactions(firstSetOfTransactions)
+blockChain.minePendingTransactions("swapnil")
+
+console.log(blockChain.chain)
+console.log("blockChain.isValid: " + blockChain.isValid())
+console.log("Balance for Swapnil is : " + blockChain.getBalance("swapnil"))
+
+let secondSetOfTransactions = [
+    new Transaction("swapnil", "supriya", 50),
+    new Transaction("supriya", "swapnil", 50)
+]
+blockChain.createTransactions(secondSetOfTransactions)
+blockChain.minePendingTransactions("swapnil")
+
+console.log(blockChain.chain)
+console.log("blockChain.isValid: " + blockChain.isValid())
+console.log("Balance for Swapnil is : " + blockChain.getBalance("swapnil"))
+
+blockChain.minePendingTransactions("swapnil")
+console.log(blockChain.chain)
+console.log("blockChain.isValid: " + blockChain.isValid())
+console.log("Balance for Swapnil is : " + blockChain.getBalance("swapnil"))
+
